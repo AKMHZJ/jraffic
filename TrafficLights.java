@@ -7,4 +7,5 @@ public class TrafficLights {
     public Direction current_direction = Direction.Right;
     public boolean state = false;
     public long phaseStartMs = TrafficLightsSystem.nowMs();
+    public long lastLaneCheckMs = phaseStartMs;
 }

@@ -11,31 +11,52 @@ public class TrafficLightsSystem {
 
     static final long GREEN_MS = 2500;
     static final long CLEARANCE_MS = 1500;
+    static final long CHECK_INTERVAL_MS = 1000;
 
     public static void update(TrafficLights l, List<Car> cars) {
-        boolean[] active = new boolean[4];
-
-        for (int i = 0; i < active.length; i++) {
-            Lane lane = LANES[i];
-            boolean any = cars.stream().anyMatch(c -> c.origin == lane.dir);
-            active[i] = any;
-        }
-
-        long elapsed = nowMs() - l.phaseStartMs;
+        long now = nowMs();
+        long elapsed = now - l.phaseStartMs;
         int curIdx = dirIdx(l.current_direction);
 
         if (l.state) {
-            if (!active[curIdx] || elapsed >= GREEN_MS) {
-                
+            if (elapsed >= GREEN_MS) {
                 l.state = false;
-                l.phaseStartMs = nowMs();
+                allRed(l);
+                l.phaseStartMs = now;
+                return;
+            }
+
+            if (now - l.lastLaneCheckMs >= CHECK_INTERVAL_MS) {
+                l.lastLaneCheckMs = now;
+                Direction curDir = idxDir(curIdx);
+                if (countWaitingCars(cars, curDir) == 0) {
+                    l.state = false;
+                    allRed(l);
+                    l.phaseStartMs = now;
+                }
             }
         } else if (elapsed >= CLEARANCE_MS) {
-            int nextIdx = nextActiveIdx(curIdx, active);
+            int nextIdx = (curIdx + 1) % 4;
             setGreen(l, nextIdx);
             l.state = true;
-            l.phaseStartMs = nowMs();
+            l.phaseStartMs = now;
+            l.lastLaneCheckMs = now;
         }
+    }
+
+    public static int countWaitingCars(List<Car> cars, Direction direction) {
+        return (int) cars.stream().filter(c -> {
+            if (c.dir != direction) {
+                return false;
+            }
+
+            return switch (direction) {
+                case Down -> c.y >= 420;
+                case Top -> c.y <= 240;
+                case Right -> c.x <= 300;
+                case Left -> c.x >= 470;
+            };
+        }).count();
     }
 
     public static void applyToCar(Car car, TrafficLights l) {
